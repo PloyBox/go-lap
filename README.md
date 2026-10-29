@@ -56,9 +56,9 @@ Just like upstream `lapmod`, it doesn't take `extend_cost` or `cost_limit` optio
 
 A few constraints to keep in mind for `Lapmod`:
 
-* Stored costs must be in `[0, 1e6)`.
-* Don't store `+Inf` entries; just omit them from the CSR arrays.
-* If no feasible complete assignment exists, `res.Cost` will be `+Inf`.
+- Stored costs must be in `[0, 1e6)`.
+- Don't store `+Inf` entries; just omit them from the CSR arrays.
+- If no feasible complete assignment exists, `res.Cost` will be `+Inf`.
 
 ## Python vs. Go API
 
@@ -86,25 +86,25 @@ A few constraints to keep in mind for `Lapmod`:
 
 ## Notes & Edge Cases
 
-* **Square matrices**: Solved directly. `X` and `Y` are inverse permutations of each other.
-* **Non-square matrices**: Requires `WithExtendCost(true)`, which pads the matrix with zeros up to `max(r, c)²` before solving. Without it, `Lapjv` returns `ErrNotSquare`.
-* **Cost limits (`WithCostLimit(l)`)**: Internally expands the matrix to `(r+c)×(r+c)`, filling off-diagonal blocks with `l/2` and the bottom-right block with `0`. Assignments with `cost > l` are dropped (`-1`), `< l` are kept, and exact `= l` ties depend on solver tie-breaking.
-* **`Inf` and negative costs**: Supported out of the box in `Lapjv`. Unsolvable matrices return `Cost = +Inf`.
-* **Sparse bounds checking**: The original C code for `lapmod` doesn't do bounds checking and can read out of bounds on unsolvable inputs. This port validates that `kk` is strictly sorted per row, returns `Cost = +Inf` on unsolvable inputs, and safely marks remaining rows as `-1`.
-* **Empty / malformed inputs**: Passing a `0×0` matrix to `Lapjv` returns `Cost = 0` with empty slices. Ragged 2D slices (rows of different lengths) return `ErrRagged`. `Lapmod` returns `ErrNoRows` or `ErrNoCols` on empty inputs, matching upstream's `check_cost`.
+- **Square matrices**: Solved directly. `X` and `Y` are inverse permutations of each other.
+- **Non-square matrices**: Requires `WithExtendCost(true)`, which pads the matrix with zeros up to `max(r, c)²` before solving. Without it, `Lapjv` returns `ErrNotSquare`.
+- **Cost limits (`WithCostLimit(l)`)**: Internally expands the matrix to `(r+c)×(r+c)`, filling off-diagonal blocks with `l/2` and the bottom-right block with `0`. Assignments with `cost > l` are dropped (`-1`), `< l` are kept, and exact `= l` ties depend on solver tie-breaking.
+- **`Inf` and negative costs**: Supported out of the box in `Lapjv`. Unsolvable matrices return `Cost = +Inf`.
+- **Sparse bounds checking**: The original C code for `lapmod` doesn't do bounds checking and can read out of bounds on unsolvable inputs. This port validates that `kk` is strictly sorted per row, returns `Cost = +Inf` on unsolvable inputs, and safely marks remaining rows as `-1`.
+- **Empty / malformed inputs**: Passing a `0×0` matrix to `Lapjv` returns `Cost = 0` with empty slices. Ragged 2D slices (rows of different lengths) return `ErrRagged`. `Lapmod` returns `ErrNoRows` or `ErrNoCols` on empty inputs, matching upstream's `check_cost`.
 
 ## Testing & Verification
 
 To make sure the port is solid, it's tested against:
 
-* All fixed test cases ported directly from the upstream repo (matching assignments and tie-breakers).
-* 700 brute-force reference cases for `Lapjv` and 300 for `Lapmod`.
-* Optimality certificate checks for `n = 40, 80, 150` (dense) and `n = 100, 300` at 5–40% density (sparse).
-* Upstream's `368×368` benchmark matrix, matching the known optimal cost (`224.8899507294651`) within `1e-9` on both solvers.
+- All fixed test cases ported directly from the upstream repo (matching assignments and tie-breakers).
+- 700 brute-force reference cases for `Lapjv` and 300 for `Lapmod`.
+- Optimality certificate checks for `n = 40, 80, 150` (dense) and `n = 100, 300` at 5–40% density (sparse).
+- Upstream's `368×368` benchmark matrix, matching the known optimal cost (`224.8899507294651`) within `1e-9` on both solvers.
 
 ## Benchmarks
 
-Compared against the upstream C implementation (`gcc -O2`) on the same machine using identical fixed matrices (median of 100 runs):
+Tested against the upstream C implementation (`gcc -O2`) on the same hardware with fixed inputs (median of 100 runs).
 
 | Dense matrix | C (`gcc -O2`) | Go |
 | --- | --- | --- |
@@ -118,7 +118,10 @@ Compared against the upstream C implementation (`gcc -O2`) on the same machine u
 | 4000×4000, 40 entries/row (banded) | ~71.6 ms | ~69.0 ms |
 | 1000×1000, 10 entries/row (random, integer costs) | ~2.4 ms | ~1.3 ms |
 
-Numbers will fluctuate depending on your CPU. The dense solver stays within 5% of the C code. The sparse results are mixed: on banded matrices solved mostly by the augmenting-row-reduction phase, Go trails by ~1.5× at 1000×1000 (the two-minima scan is branch-heavy, and gcc compiles it branchlessly) and pulls even at 4000×4000, while on tie-heavy random matrices that reach the `find_path` augmentation phase Go runs ~1.9× faster—it looks up a scanned column in the sorted row by binary search instead of rebuilding the C original's reverse index for every scanned column.
+A few takeaways (YMMV depending on your CPU):
+- **Dense**: Pretty much neck-and-neck with C (within ~5%).
+- **Sparse (banded)**: Go lags behind by ~1.5x at 1000×1000, then evens out at 4000×4000. These spend most of their time in the augmenting-row-reduction phase. The two-minima scan has a lot of branches that `gcc` optimizes into branchless assembly, whereas the Go compiler struggles a bit.
+- **Sparse (random, integer costs)**: Go is nearly 2x faster here. Tie-heavy inputs push the solver into the `find_path` phase. The C version rebuilds a reverse index for every scanned column, while we just do a binary search over the sorted row.
 
 To run the Go benchmarks yourself:
 
