@@ -1,7 +1,9 @@
-lap
+go-lap
 Copyright 2026 PloyBox
 
-This product includes code ported from gatagat/lap
+This product is available at https://github.com/PloyBox/go-lap.
+
+This product includes code ported from, and test data copied from, gatagat/lap
 (https://github.com/gatagat/lap), Copyright (c) 2012-2025, Tomas Kazmar,
 licensed under the BSD 2-Clause License:
 
