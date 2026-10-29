@@ -1,0 +1,11 @@
+# Go build/test cache kept inside the workspace during development.
+.gocache/
+
+# C benchmark build artifacts (bench/run.sh downloads upstream sources).
+bench/bench_c
+bench/bench_mod_c
+bench/lap.tar.gz
+bench/lap-0.5.13/
+bench/lapjv.c
+bench/lapjv.h
+bench/lapmod.c
